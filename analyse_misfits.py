@@ -517,3 +517,126 @@ def get_good_bad_events(misfit_dict, iter1, iter2, goodorbad=None):
             '({0:+5.1f}  = {1:5.1f}%)'.format(incr, 100.*rel_incr)
           
   return good_ones, bad_ones
+  
+def plot_iter_correlations(Lasif_path, iter_name, prop1, prop2, save=False, savepath='./plots/'):
+
+  '''
+  Plot for example the correlation between # of windows and total misfit
+  
+  Properties calculated for each event are:
+  nsta         :  # of stations available
+  nwinsta      :  # of windows in iter
+  event_mag    :  event magnitude
+  total_misfit :  total misfit in iter
+  
+  prop1 and prop2 can be any of the above
+  '''
+  
+  # check whether input is alright
+  allowed_props = ['total_misfit', 'nsta', 'nwinsta', 'event_mag']
+  for prop in [prop1, prop2]:
+    if prop not in allowed_props:
+      print 'ERROR: property {} not in allowed properties, i.e. {}'.format(prop, ', '.join(allowed_props))
+      return
+  
+  # Lasif preparation
+  from lasif.components.project import Project
+  comm = Project(Lasif_path).comm
+  it = comm.iterations.get(iter_name)
+  events_in_iter = sorted(it.events.keys())
+  
+  ## ====================
+  ## Gathering properties
+  
+  # misfits - dict
+  # Obtaining misfits in the usable format (if misfits are required
+  if 'total_misfit' in [prop1, prop2]:
+    misfit_npy_file_name='iter_misfit.'+iter_name+'.npy'
+    if os.path.exists(misfit_npy_file_name):
+      print 'Loading misfit for iteration '+iter_name+' from file'
+      _, misfits_per_event = np.load(misfit_npy_file_name)
+    elif Lasif_path:
+      print 'Calculating misfit for iteration '+iter_name
+      _, misfits_per_event = calc_misfit(Lasif_path, iter_name, save=True, verbose=True)
+    else:
+      print 'Error: need to calculate misfits, but no lasif path supplied'
+      return
+  # make into list
+  misfits = []
+  for event_name in events_in_iter:
+    misfits.append(misfits_per_event[event_name])
+   
+   
+  # number of stations per event - dict
+  nsta = []
+  for event_name in events_in_iter:
+    itev = it.events[event_name]
+    #nsta[event_name] = len(itev['stations'])
+    nsta.append(len(itev['stations']))
+    
+
+  # number of stations with windows per event - dict
+  nwinsta = []
+  for event_name in events_in_iter:
+    wm = comm.windows.get(event_name, iter_name)
+    window_channels = wm.list()
+    window_stations = ['.'.join(chan.split('.')[:-2]) for chan in window_channels]
+    window_stations = sorted(list(set(window_stations)))
+#    nwinsta[event_name] = len(window_stations)
+    nwinsta.append(len(window_stations))
+    
+  
+  # event magnitude
+  mags = []
+  for event_name in events_in_iter:
+    ev = comm.events.get(event_name)
+#    mags[event_name] = ev['magnitude']
+    mags.append(ev['magnitude'])
+      
+  ## ====================
+  ## Plotting properties
+  
+  propslist = []; labels = []
+  for prop in [prop1, prop2]:
+    if prop == 'total_misfit':
+      propslist.append(misfits)
+      labels.append('total misfit for event')
+    elif prop == 'nsta':
+      propslist.append(nsta)
+      labels.append('number of stations for event')
+    elif prop == 'nwinsta':
+      propslist.append(nwinsta)
+      labels.append('number of stations with windows for event')
+    elif prop == 'event_magnitude':
+      propslist.append(mags)
+      labels.append('event magnitude')
+  
+
+  if not len(propslist) == 2:
+    print 'ERROR: not two property lists?: {}'.format(len(propslist))
+    return
+    
+  # plot
+  fig, ax1 = plt.subplots(1, figsize=(12.,10.))
+  
+  ax1.scatter(propslist[0], propslist[1], marker='o')
+  ax1.set_xlabel(labels[0])
+  ax1.set_ylabel(labels[1])
+  ax1.set_title('Correlations for {}'.format(iter_name))
+  
+ # Actual displaying
+  if save:
+    savename='iter_{}.correlations.{}-vs-{}.png'.format(iter_name, prop1, prop2)
+    savepath=os.path.join(savepath,savename)
+    print 'saving figure to '+savepath
+    plt.savefig(savepath)
+    plt.close()
+  else:
+    plt.ion()
+    plt.show()
+    plt.ioff()
+  
+  
+  
+    
+      
