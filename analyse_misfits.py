@@ -541,7 +541,8 @@ def plot_iter_correlations(Lasif_path, iter_name, prop1, prop2, save=False, save
       print 'ERROR: property {} not in allowed properties, i.e. {}'.format(prop, ', '.join(allowed_props))
       return
   
-  from SCRIPTS.Annotations import AnnoteFinder
+  from LASIF_scripts.external_fn  
+  .Annotations import AnnoteFinder
   
   # Lasif preparation
   from lasif.components.project import Project
