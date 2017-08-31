@@ -518,26 +518,30 @@ def get_good_bad_events(misfit_dict, iter1, iter2, goodorbad=None):
           
   return good_ones, bad_ones
   
-def plot_iter_correlations(Lasif_path, iter_name, prop1, prop2, save=False, savepath='./plots/'):
+def plot_iter_correlations(Lasif_path, iter_name, prop1, prop2, save=False, savepath='./plots/', loglogplot=False, no_output=True):
 
   '''
   Plot for example the correlation between # of windows and total misfit
   
   Properties calculated for each event are:
-  nsta         :  # of stations available
-  nwinsta      :  # of windows in iter
-  event_mag    :  event magnitude
-  total_misfit :  total misfit in iter
+  nsta            :  # of stations available
+  nwinsta         :  # of windows in iter
+  nwinsta/nsta    :  percentage of stations with windows
+  event_magnitude :  event magnitude
+  total_misfit    :  total misfit in iter
+  event_magnitude*nsta : event mangitude corrected for the number of stations available
   
   prop1 and prop2 can be any of the above
   '''
   
   # check whether input is alright
-  allowed_props = ['total_misfit', 'nsta', 'nwinsta', 'event_mag']
+  allowed_props = ['total_misfit', 'nsta', 'nwinsta', 'event_magnitude', 'nwinsta/nsta', 'event_magnitude*nsta']
   for prop in [prop1, prop2]:
     if prop not in allowed_props:
       print 'ERROR: property {} not in allowed properties, i.e. {}'.format(prop, ', '.join(allowed_props))
       return
+  
+  from SCRIPTS.Annotations import AnnoteFinder
   
   # Lasif preparation
   from lasif.components.project import Project
@@ -561,10 +565,10 @@ def plot_iter_correlations(Lasif_path, iter_name, prop1, prop2, save=False, save
     else:
       print 'Error: need to calculate misfits, but no lasif path supplied'
       return
-  # make into list
-  misfits = []
-  for event_name in events_in_iter:
-    misfits.append(misfits_per_event[event_name])
+    # make into list
+    misfits = []
+    for event_name in events_in_iter:
+      misfits.append(misfits_per_event[event_name])
    
    
   # number of stations per event - dict
@@ -610,6 +614,12 @@ def plot_iter_correlations(Lasif_path, iter_name, prop1, prop2, save=False, save
     elif prop == 'event_magnitude':
       propslist.append(mags)
       labels.append('event magnitude')
+    elif prop == 'nwinsta/nsta':
+      propslist.append([100.*x/y for x,y in zip(nwinsta, nsta)])
+      labels.append('percentage of stations with windows')
+    elif prop == 'event_magnitude*nsta':
+      propslist.append([x*y for x,y in zip(mags, nsta)])
+      labels.append('event magnitude * number of stations for event')
   
 
   if not len(propslist) == 2:
@@ -619,12 +629,32 @@ def plot_iter_correlations(Lasif_path, iter_name, prop1, prop2, save=False, save
   # plot
   fig, ax1 = plt.subplots(1, figsize=(12.,10.))
   
-  ax1.scatter(propslist[0], propslist[1], marker='o')
+#  x = range(10)
+#  y = range(10)
+#  annotes = ['a', 'b', 'c', 'd', 'e', 'f', 'g', 'h', 'i', 'j']
+
+#  fig, ax = plt.subplots()
+#  ax.scatter(x,y)
+#  af =  AnnoteFinder(x,y, annotes, ax=ax)
+#  fig.canvas.mpl_connect('button_press_event', af)
+#  plt.show()
+  
+  
+  ax1.scatter(propslist[0], propslist[1], marker='o', edgecolor='none')
+  ax1.grid(True)
+  af = AnnoteFinder(propslist[0], propslist[1], events_in_iter, ax=ax1)
   ax1.set_xlabel(labels[0])
   ax1.set_ylabel(labels[1])
   ax1.set_title('Correlations for {}'.format(iter_name))
   
- # Actual displaying
+  if loglogplot:
+    ax1.set_xscale('log')
+    ax1.set_yscale('log')
+  
+  # Make the annotations visible upon clicking a point
+  fig.canvas.mpl_connect('button_press_event', af)
+  
+  # Actual displaying
   if save:
     savename='iter_{}.correlations.{}-vs-{}.png'.format(iter_name, prop1, prop2)
     savepath=os.path.join(savepath,savename)
@@ -636,6 +666,8 @@ def plot_iter_correlations(Lasif_path, iter_name, prop1, prop2, save=False, save
     plt.show()
     plt.ioff()
   
+  if not no_output:
+    return fig, ax1
   
   
     
